@@ -350,7 +350,7 @@ class EventLocation(CampRelatedModel):
     class Meta:
         unique_together = (('camp', 'slug'), ('camp', 'name'))
 
-    def to_json(self):
+    def serialize(self):
         return {
             "name": self.name,
             "slug": self.slug,
@@ -396,7 +396,7 @@ class EventType(CreatedUpdatedModel):
     def __str__(self):
         return self.name
 
-    def to_json(self):
+    def serialize(self):
         return {
             "name": self.name,
             "slug": self.slug,
@@ -467,6 +467,18 @@ class Event(CampRelatedModel):
     def get_absolute_url(self):
         return reverse_lazy('event_detail', kwargs={'camp_slug': self.camp.slug, 'slug': self.slug})
 
+    def serialize(self):
+        data = {
+            'title': self.title,
+            'slug': self.slug,
+            'abstract': self.abstract,
+            'speakers': [
+                speaker.serialize()
+                for speaker in self.speakers.all()
+            ],
+        }
+        return data
+
 
 class EventInstance(CampRelatedModel):
     """ An instance of an event """
@@ -533,24 +545,15 @@ class EventInstance(CampRelatedModel):
         ievent['location'] = icalendar.vText(self.location.name)
         return ievent
 
-    def to_json(self, user=None):
-        parser = CommonMark.Parser()
-        renderer = CommonMark.HtmlRenderer()
-        ast = parser.parse(self.event.abstract)
-        abstract = renderer.render(ast)
-
+    def serialize(self, user=None):
         data = {
             'title': self.event.title,
+            'slug': self.event.slug + '-' + str(self.id),
             'event_slug': self.event.slug,
-            'abstract': abstract,
             'from': self.when.lower.astimezone().isoformat(),
             'to': self.when.upper.astimezone().isoformat(),
             'url': str(self.event.get_absolute_url()),
             'id': self.id,
-            'speakers': [
-                {'name': speaker.name, 'url': str(speaker.get_absolute_url())}
-                for speaker in self.event.speakers.all()
-            ],
             'bg-color': self.event.event_type.color,
             'fg-color': '#fff' if self.event.event_type.light_text else '#000',
             'event_type': self.event.event_type.slug,
@@ -646,6 +649,12 @@ class Speaker(CampRelatedModel):
 
     def get_absolute_url(self):
         return reverse_lazy('speaker_detail', kwargs={'camp_slug': self.camp.slug, 'slug': self.slug})
+
+    def serialize(self):
+        data = {
+            'name': self.name,
+        }
+        return data
 
 
 class Favorite(models.Model):
